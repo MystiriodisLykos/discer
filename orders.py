@@ -91,3 +91,40 @@ def _tuple(x: A) -> Tuple[A, A]:
 def refine(r1: Order[A], r2: Order[A]) -> Order[A]:
     """Creates an Order that does r1 first then r2"""
     return Map(_tuple, Product(r1, r2))
+
+def sdisc(o: Order[A]) -> Disc[A]:
+    def res(xs: List[Tuple[B, A]]) -> List[List[A]]:
+        if len(xs) == 0:
+            return []
+        if len(xs) == 1:
+            return [[xs[0][1]]]
+        if type(o) is Trivial:
+            return [[x[1] for x in xs]]
+        if type(o) is Natural:
+            reveal_type(o)
+            res = [[] for i in range(o.n)]
+            for k, v in xs:
+                res[k].append(v)
+            return list(filter(lambda x: len(x) != 0, res))
+        if type(o) is Sum:
+            lefts = []
+            rights = []
+            for k, v in xs:
+                if type(k) is Left:
+                    lefts.append((k.left, v))
+                if type(k) is Right:
+                    rights.append((k.right, v))
+            return sdisc(o.left)(lefts) + sdisc(o.right)(rights)
+        if type(o) is Product:
+            ys = []
+            for k, v in xs:
+                # Reorder xs so the key is just the first pair of the product
+                k1, k2 = k
+                ys.append((k1, (k2, v)))
+            res = []
+            for y in sdics(o.fst)(ys):
+                res.extend(sdics(o.snd)(y))
+            return res
+        if type(o) is Map:
+            return sdics(o.target)([(o.f(k), v) for k, v in xs])
+    return res
