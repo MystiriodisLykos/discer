@@ -21,7 +21,7 @@ class Trivial(Generic[A]):
     pass
 
 class Natural(Generic[A]):
-    def __new__(cls, n: int) -> "Natural[int]":
+    def __new__(cls, n: I) -> "Natural[I]":
         inst = super(Natural, cls).__new__(cls)
         inst.n = n  # type: ignore[attr-defined]
         return inst  # type: ignore[return-value]
@@ -94,19 +94,23 @@ def refine(r1: Order[A], r2: Order[A]) -> Order[A]:
 
 def sdisc(o: Order[A]) -> Disc[A, B]:
     def res(xs: List[Tuple[A, B]]) -> List[List[B]]:
+        reveal_type(o)
         if len(xs) == 0:
             return []
         if len(xs) == 1:
             return [[xs[0][1]]]
-        if type(o) is Trivial:
+        if isinstance(o, Trivial):
+            reveal_type(o)
             return [[x[1] for x in xs]]
         if type(o) is Natural:
             reveal_type(o)
+            reveal_type(xs)
             res = [[] for i in range(o.n)]
             for k, v in xs:
                 res[k].append(v)
             return list(filter(lambda x: len(x) != 0, res))
         if type(o) is Sum:
+            reveal_type(o)
             lefts = []
             rights = []
             for k, v in xs:
@@ -115,6 +119,7 @@ def sdisc(o: Order[A]) -> Disc[A, B]:
                 if type(k) is Right:
                     rights.append((k.right, v))
             return sdisc(o.left)(lefts) + sdisc(o.right)(rights)
+        """
         if type(o) is Product:
             ys = []
             for k, v in xs:
@@ -126,5 +131,7 @@ def sdisc(o: Order[A]) -> Disc[A, B]:
                 res.extend(sdics(o.snd)(y))
             return res
         if type(o) is Map:
-            return sdics(o.target)([(o.f(k), v) for k, v in xs])
+            reveal_type(o)
+            return sdisc(o.target)([(o.f(k), v) for k, v in xs])
+        """
     return res
