@@ -92,8 +92,8 @@ def refine(r1: Order[A], r2: Order[A]) -> Order[A]:
     """Creates an Order that does r1 first then r2"""
     return Map(_tuple, Product(r1, r2))
 
-def sdisc(o: Order[A]) -> Disc[A]:
-    def res(xs: List[Tuple[B, A]]) -> List[List[A]]:
+def sdisc(o: Order[A]) -> Disc[A, B]:
+    def res(xs: List[Tuple[A, B]]) -> List[List[B]]:
         if len(xs) == 0:
             return []
         if len(xs) == 1:
