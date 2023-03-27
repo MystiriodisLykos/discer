@@ -1,10 +1,13 @@
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Union, Callable, List, Tuple, TypeGuard, Type
+from typing import Generic, TypeVar, Union, Callable, List, Tuple, TypeGuard, Type, cast, Protocol
 
 A = TypeVar("A")
 B = TypeVar("B")
+F = TypeVar("F")
 S = TypeVar("S")
 P = TypeVar("P")
+V = TypeVar("V")
+O = TypeVar("O", bound="Order")
 I = TypeVar("I", bound=int)
 
 
@@ -18,39 +21,30 @@ class Natural(Generic[A]):
     def __init__(self: "Natural[int]", n: int):
         self.n = n
 
-def is_nat_int(o: Natural[A]) -> TypeGuard[Natural[int]]:
-    if issubclass(type(o.n), int):
-        return True
-    raise ValueError(f"How did you create Natural {o} not of type Natural[int]?")
-
-@dataclass
-class _NatList(Generic[A, B]):
-    # I think I need a more generic OrdList class that is just used to guard
-    # the order and list simultaneously
-    o: Natural[A]
-    xs: List[Tuple[A, B]]
-
-    @staticmethod
-    def is_valid_nat(nl: "_NatList[A, B]") -> "TypeGuard[_NatList[int, B]]":
-        return is_nat_int(nl.o)
 
 class Product(Generic[S]):
     def __new__(cls, fst: "Order[A]", snd: "Order[B]") -> "Product[Tuple[A, B]]":
         inst = super(Product, cls).__new__(cls)
         # init done here because adding __init__ causes the return type of __new__ to be ignored/overwritten
-        inst.fst = fst  # type: ignore[attr-defined]
-        inst.snd = snd  # type: ignore[attr-defined]
-        return inst  # type: ignore[return-value]
+        # Types for fst and snd are added through properties
+        inst._fst = fst # type: ignore[attr-defined]
+        inst._snd = snd # type: ignore[attr-defined]
+        return inst # type: ignore[return-value]
+
+    @property
+    def fst(self: "Product[Tuple[A, B]]") -> "Order[A]":
+        return self._fst # type: ignore[attr-defined]
+    
+    @property
+    def snd(self: "Product[Tuple[A, B]]") -> "Order[B]":
+        return self._snd # type: ignore[attr-defined]
 
 
 class Map(Generic[S]):
-    def __new__(cls, f: Callable[[A], B], target: "Order[B]") -> "Map[A]":
-        inst = super(Map, cls).__new__(cls)
-        # init done here because adding __init__ causes the return type of __new__ to be ignored/overwritten
-        inst.f = f  # type: ignore[attr-defined]
-        inst.target = target  # type: ignore[attr-defined]
-        return inst  # type: ignore[return-value]
-
+    def __init__(self: "Map[S]", f: Callable[[S], B], target: "Order[B]"):
+        self.f = f
+        reveal_type(f)
+        self.target = target
 
 Order = Union[
     Trivial[A],
@@ -58,9 +52,32 @@ Order = Union[
     Product[A],
     Map[A],
 ]
-    
-Disc = Callable[[List[Tuple[A, B]]], List[List[B]]]
 
+
+@dataclass
+class _OrdList(Generic[O, A, V]):
+    """ Pair of an Order and key/pair List to be descrimiated
+    Used internally in disc to provide a TypeGuard against the Order and List simultaneously
+    """
+    o: O
+    xs: List[Tuple[A, V]]
+
+    @staticmethod
+    def is_trivial(ol: "_OrdList[O, A, V]") -> "TypeGuard[_OrdList[Trivial[A], A, V]]":
+        return isinstance(ol.o, Trivial)
+
+    @staticmethod
+    def is_natural(ol: "_OrdList[O, A, V]") -> "TypeGuard[_OrdList[Natural[int], int, V]]":
+        return isinstance(ol.o, Natural) and isinstance(ol.o.n, int)
+
+    @staticmethod
+    def is_product(ol: "_OrdList[O, A, V]") -> "TypeGuard[_OrdList[Product[Tuple[F, S]], Tuple[F, S], V]]":
+        return isinstance(ol.o, Product)
+
+    @staticmethod
+    def is_map(ol: "_OrdList[O, A, V]") -> "TypeGuard[_OrdList[Map[A], A, V]]":
+        return isinstance(ol.o, Map)
+    
 ordUnit: Trivial[None] = Trivial()
 
 ordNat8  = Natural(255)
@@ -74,12 +91,15 @@ def _split(i: int) -> Tuple[int, int]:
 # first 16 bits are grouped into the negative numbers and the second half are the positive numbers
 # I think is the representation meant here.
 ordInt32 = Map(_split, Product(ordNat16, ordNat16))
-reveal_type(ordInt32)
 
 def _mod_2(i: int) -> int:
     return i % 2
 
 evenOdd = Map(_mod_2, Natural(1))
+reveal_type(Map)
+reveal_type(evenOdd)
+reveal_type(evenOdd.f(1))
+reveal_type(evenOdd.target)
 
 def _tuple(x: A) -> Tuple[A, A]:
     return (x, x)
@@ -89,39 +109,39 @@ def refine(r1: Order[A], r2: Order[A]) -> Order[A]:
     return Map(_tuple, Product(r1, r2))
 
 
-def sdisc(o: Order[A]) -> Disc[A, B]:
-    def res(xs: List[Tuple[A, B]]) -> List[List[B]]:
-        reveal_type(o)
+def sdisc(o: Order[A], xs: List[Tuple[A, B]]) -> List[List[B]]:
+        """Order a -> [(a, b)] -> [[b]]"""
+        ol = _OrdList(o, xs)
         if len(xs) == 0:
             return []
         elif len(xs) == 1:
             return [[xs[0][1]]]
-        elif isinstance(o, Trivial):
-            return [[x[1] for x in xs]]
-        elif isinstance(o, Natural):
-            nl = _NatList(o, xs)
-            if nl.is_valid_nat(nl):
-                o = nl.o
-                rxs = nl.xs
-                reveal_type(o)
-                reveal_type(rxs)
-                res = [[] for i in range(o.n)]
-                for k, v in rxs:
-                    res[k].append(v)
-                    return list(filter(lambda x: len(x) != 0, res))
-        """
-        elif type(o) is Product:
+        elif ol.is_trivial(ol):
+            return [[x[1] for x in ol.xs]]
+        elif ol.is_natural(ol):
+            res: List[List[B]] = [[] for i in range(ol.o.n+1)]
+            print(res)
+            for k, v in ol.xs:
+                print(k, v)
+                res[k].append(v)
+            return list(filter(lambda x: len(x) != 0, res))
+        elif ol.is_product(ol):
             ys = []
-            for k, v in xs:
+            for kp, v in ol.xs:
                 # Reorder xs so the key is just the first pair of the product
-                k1, k2 = k
+                k1, k2 = kp
                 ys.append((k1, (k2, v)))
             res = []
-            for y in sdics(o.fst)(ys):
-                res.extend(sdics(o.snd)(y))
+            for y in sdisc(ol.o.fst, ys):
+                res.extend(sdisc(ol.o.snd, y))
             return res
-        elif type(o) is Map:
-            reveal_type(o)
-            return sdisc(o.target)([(o.f(k), v) for k, v in xs])
         """
-    return res
+        elif ol.is_map(ol):
+            reveal_type(ol.o.f)
+            reveal_type(ol.xs)
+            mapped = [(ol.o.f(k), v) for k, v in ol.xs]
+            return sdisc(ol.o.target, mapped)
+        """
+        raise ValueError(f"Unknown Order {type(o)}")
+
+
