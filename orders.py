@@ -41,9 +41,12 @@ class Product(Generic[S]):
 
 
 class Map(Generic[S]):
+    # This implemntation isn't perfect because the precise type of B gets lost.
+    # Adding a second type variable just to keep track of it ends up causing a lot (possibly infinite) type
+    # data to be inlcuded in Map and other Orders that is not super relavent to the Order itself.
+    # See <#todo> for more info.
     def __init__(self: "Map[S]", f: Callable[[S], B], target: "Order[B]"):
         self.f = f
-        reveal_type(f)
         self.target = target
 
 Order = Union[
@@ -96,16 +99,12 @@ def _mod_2(i: int) -> int:
     return i % 2
 
 evenOdd = Map(_mod_2, Natural(1))
-reveal_type(Map)
-reveal_type(evenOdd)
-reveal_type(evenOdd.f(1))
-reveal_type(evenOdd.target)
 
 def _tuple(x: A) -> Tuple[A, A]:
     return (x, x)
 
 def refine(r1: Order[A], r2: Order[A]) -> Order[A]:
-    """Creates an Order that does r1 first then r2"""
+    """Creates an Order on A that does r1 first then r2"""
     return Map(_tuple, Product(r1, r2))
 
 
@@ -120,9 +119,7 @@ def sdisc(o: Order[A], xs: List[Tuple[A, B]]) -> List[List[B]]:
             return [[x[1] for x in ol.xs]]
         elif ol.is_natural(ol):
             res: List[List[B]] = [[] for i in range(ol.o.n+1)]
-            print(res)
             for k, v in ol.xs:
-                print(k, v)
                 res[k].append(v)
             return list(filter(lambda x: len(x) != 0, res))
         elif ol.is_product(ol):
@@ -135,13 +132,9 @@ def sdisc(o: Order[A], xs: List[Tuple[A, B]]) -> List[List[B]]:
             for y in sdisc(ol.o.fst, ys):
                 res.extend(sdisc(ol.o.snd, y))
             return res
-        """
         elif ol.is_map(ol):
-            reveal_type(ol.o.f)
-            reveal_type(ol.xs)
             mapped = [(ol.o.f(k), v) for k, v in ol.xs]
             return sdisc(ol.o.target, mapped)
-        """
         raise ValueError(f"Unknown Order {type(o)}")
 
 
