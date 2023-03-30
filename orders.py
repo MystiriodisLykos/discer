@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from itertools import chain
 from typing import Generic, TypeVar, Union, Callable, List, Tuple, TypeGuard, Type, cast, Protocol
 
 A = TypeVar("A")
@@ -137,4 +138,24 @@ def sdisc(o: Order[A], xs: List[Tuple[A, B]]) -> List[List[B]]:
             return sdisc(ol.o.target, mapped)
         raise ValueError(f"Unknown Order {type(o)}")
 
+def sorted_partition(o: Order[A], xs: List[A]) -> List[List[A]]:
+    return sdisc(o, [(x,x) for x in xs])
 
+def sort(o: Order[A], xs: List[A]) -> List[A]:
+    return list(chain.from_iterable(sorted_partition(o, xs)))
+
+def test(max_=1000, len_=1000, iters=1000):
+    import time
+    import random
+    standard = 0
+    new = 0
+    for _ in range(iters):
+        l = [random.randint(0,max_) for _ in range(len_)]
+        start = time.time_ns()
+        o = sorted(l, key = lambda x: x%2)
+        standard += (time.time_ns() - start)
+        start = time.time_ns()
+        n = sort(evenOdd, l)
+        new += (time.time_ns() - start)
+        assert o == n
+    return standard, new
