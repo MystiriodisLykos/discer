@@ -51,3 +51,5 @@ def sorted_partition(o: Relation[A], xs: List[A]) -> List[List[A]]:
 def sort(o: Relation[A], xs: List[A]) -> List[A]:
     return list(chain.from_iterable(sorted_partition(o, xs)))
 
+def sort_unique(o: Relation[A], xs: List[A]) -> List[A]:
+    return [c[0] for c in sorted_partition(o, xs)]
