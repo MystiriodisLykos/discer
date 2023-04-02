@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "discr"
-version = "0.0.1"
+version = "0.1.0"
 description = "Generic linear-time sorting"
 authors = [{ name = "Brendan", email = "brendandeleeuw@gmail.com" }]
 classifiers = [
@@ -16,7 +16,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 
 [project.urls]
-Homepage = "https://github.com/MystiriodisLykos/discr/tree/v0.0.1"
+Homepage = "https://github.com/MystiriodisLykos/discr/tree/v0.1.0"
 
 [tool.setuptools]
 zip-safe = false
