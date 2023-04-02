@@ -20,7 +20,6 @@ from typing import (
     Tuple,
     TypeGuard,
     Type,
-    cast,
     Protocol,
 )
 
@@ -33,12 +32,26 @@ S = TypeVar("S")
 V = TypeVar("V")
 
 
+@dataclass
+class Left(Generic[A]):
+    left: A
+
+
+@dataclass
+class Right(Generic[A]):
+    right: A
+
+
+Either = Union[Left[A], Right[B]]
+
+
 class Relation(Protocol[C]):
     """A generic relation over the type C
 
     The exact nature of the Relation is decided by the function that uses the Relation.
     For example, sdisc treats the Relation as a binary ordering Relation.
     """
+
     ...
 
 
@@ -64,6 +77,7 @@ class Trivial(Relation[A]):
     If you think about just the case where Trivial[A] represents a binary relation on A then
     it is the relation where everything relates to everything else, formally { (a, b) | a, b in A }.
     """
+
     pass
 
 
@@ -75,12 +89,22 @@ class Natural(Relation[int]):
     Consider the case where this represents a binary ordering Relation, this representation is then
     { (a, b) | a <= b and a, b in [0..n] }.
     """
+
     n: int
 
 
 @dataclass
+class SumL(Relation[Either[A, B]]):
+    """Represents the 'Left' union on Either[A, B] where the Left Relation on A takes precedent."""
+
+    left: Relation[A]
+    right: Relation[B]
+
+
+@dataclass
 class ProductL(Relation[Tuple[A, B]]):
-    """Represents the Lexagraphic product on a Tuple[A, B] where the Relation on A takes precedent."""
+    """Represents the Lexagraphic product on a Tuple[A, B] where the first Relation on A takes precedent."""
+
     fst: Relation[A]
     snd: Relation[B]
 
@@ -88,6 +112,7 @@ class ProductL(Relation[Tuple[A, B]]):
 @dataclass
 class Map(Relation[A], Generic[A, B]):
     """Represents a Relation mapping into another relation."""
+
     f: Callable[[A], B]
     source: Relation[B]
 
@@ -108,6 +133,12 @@ class _RelList(Generic[R, A, V]):
     @staticmethod
     def is_natural(rl: "_RelList[R, A, V]") -> "TypeGuard[_RelList[Natural, int, V]]":
         return isinstance(rl.relation, Natural)
+
+    @staticmethod
+    def is_sum(
+        rl: "_RelList[R, A, V]",
+    ) -> "TypeGuard[_RelList[SumL[F, S], Either[F, S], V]]":
+        return isinstance(rl.relation, SumL)
 
     @staticmethod
     def is_product(
@@ -167,6 +198,15 @@ def sdisc(o: Relation[A], xs: List[Tuple[A, V]]) -> List[List[V]]:
         for k, v in rl.xs:
             res[k].append(v)
         return list(filter(lambda x: len(x) != 0, res))
+    elif rl.is_sum(rl):
+        lefts = []
+        rights = []
+        for e, v in rl.xs:
+            if isinstance(e, Left):
+                lefts.append((e.left, v))
+            else:
+                rights.append((e.right, v))
+        return sdisc(rl.relation.left, lefts) + sdisc(rl.relation.right, rights)
     elif rl.is_product(rl):
         ys = []
         for kp, v in rl.xs:
