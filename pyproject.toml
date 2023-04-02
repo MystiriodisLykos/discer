@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "discr"
+version = "0.0.1"
+description = "Generic linear-time sorting"
+authors = [{ name = "Brendan", email = "brendandeleeuw@gmail.com" }]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/MystiriodisLykos/discr/tree/v0.0.1"
+
+[tool.setuptools]
+zip-safe = false
