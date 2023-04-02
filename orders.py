@@ -13,6 +13,19 @@ V = TypeVar("V")
 class Relation(Protocol[C]):
     ...
 
+def as_relation(r: Relation[A]) -> Relation[A]:
+    """Helper function to see what the actual type the Relation is over when inspecting types
+
+    For example
+    > reveal_type(            Natural(3))   # Revealed type is "Natural"
+    > reveal_type(as_relation(Natural(3)))  # Revealed type is "Relation[int]"
+
+    > reveal_type(            ordInt32)   # Revealed type is "Map[int, int]"
+    > reveal_type(as_realtion(ordInt32))  # Revealed type is "Relation[int]"
+    """
+
+    return r
+
 @dataclass
 class Trivial(Relation[A]):
     pass
