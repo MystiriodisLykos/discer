@@ -5,6 +5,9 @@ from typing import Generic, TypeVar, Union, Callable, List, Tuple, TypeGuard, Ty
 A = TypeVar("A")
 B = TypeVar("B")
 C = TypeVar("C", covariant=True)
+R = TypeVar("R", bound="Relation")
+F = TypeVar("F")
+S = TypeVar("S")
 V = TypeVar("V")
 
 class Relation(Protocol[C]):
@@ -29,31 +32,31 @@ class Map(Relation[A], Generic[A, B]):
     f: Callable[[A], B]
     source: Relation[B]
 
-'''
+
 @dataclass
-class _RelList(Generic[O, A, V]):
+class _RelList(Generic[R, A, V]):
     """ Pair of a Relation and key/pair List to be descrimiated
     Used internally to provide a TypeGuard against the Relation and List simultaneously
     """
-    o: O
+    relation: R
     xs: List[Tuple[A, V]]
 
     @staticmethod
-    def is_trivial(ol: "_RelList[O, A, V]") -> "TypeGuard[_RelList[Trivial[A], A, V]]":
-        return isinstance(ol.o, Trivial)
+    def is_trivial(rl: "_RelList[R, A, V]") -> "TypeGuard[_RelList[Trivial[A], A, V]]":
+        return isinstance(rl.relation, Trivial)
 
     @staticmethod
-    def is_natural(ol: "_RelList[O, A, V]") -> "TypeGuard[_RelList[Natural[int], int, V]]":
-        return isinstance(ol.o, Natural) and isinstance(ol.o.n, int)
+    def is_natural(rl: "_RelList[R, A, V]") -> "TypeGuard[_RelList[Natural, int, V]]":
+        return isinstance(rl.relation, Natural)
 
     @staticmethod
-    def is_product(ol: "_RelList[O, A, V]") -> "TypeGuard[_RelList[Product[Tuple[F, S]], Tuple[F, S], V]]":
-        return isinstance(ol.o, Product)
+    def is_product(rl: "_RelList[R, A, V]") -> "TypeGuard[_RelList[Product[F, S], Tuple[F, S], V]]":
+        return isinstance(rl.relation, Product)
 
     @staticmethod
-    def is_map(ol: "_RelList[O, A, V]") -> "TypeGuard[_RelList[Map[A], A, V]]":
-        return isinstance(ol.o, Map)
-'''
+    def is_map(rl: "_RelList[R, A, V]") -> "TypeGuard[_RelList[Map[A, B], A, V]]":
+        return isinstance(rl.relation, Map)
+
     
 ordUnit = Trivial[None]()
 
@@ -81,47 +84,39 @@ def refine(r1: Relation[A], r2: Relation[A]) -> Relation[A]:
     """Creates an Order on A that does r1 first then r2"""
     return Map(_tuple, Product(r1, r2))
 
-
-def sdisc(o: Relation[A], xs: List[Tuple[A, B]]) -> List[List[B]]:
-        """Order a -> [(a, b)] -> [[b]]"""
-        reveal_type(o)
+def sdisc(o: Relation[A], xs: List[Tuple[A, V]]) -> List[List[V]]:
+        """Order a -> [(a, v)] -> [[v]]"""
+        rl = _RelList(o, xs)
         if len(xs) == 0:
             return []
         elif len(xs) == 1:
             return [[xs[0][1]]]
-        elif isinstance(o, Trivial):
-            reveal_type(o)
-            reveal_type(xs)
+        elif rl.is_trivial(rl):
             return [[x[1] for x in xs]]
-        elif isinstance(o, Natural):
-            reveal_type(o)
-            reveal_type(xs)
-            res: List[List[B]] = [[] for i in range(ol.o.n+1)]
-            for k, v in ol.xs:
+        elif rl.is_natural(rl):
+            res: List[List[V]] = [[] for i in range(rl.relation.n+1)]
+            for k, v in rl.xs:
                 res[k].append(v)
             return list(filter(lambda x: len(x) != 0, res))
-        """
-        elif ol.is_product(ol):
+        elif rl.is_product(rl):
             ys = []
-            for kp, v in ol.xs:
-                # Reorder xs so the key is just the first pair of the product
+            for kp, v in rl.xs:
                 k1, k2 = kp
                 ys.append((k1, (k2, v)))
             res = []
-            for y in sdisc(ol.o.fst, ys):
-                res.extend(sdisc(ol.o.snd, y))
+            for y in sdisc(rl.relation.fst, ys):
+                res.extend(sdisc(rl.relation.snd, y))
             return res
-        elif ol.is_map(ol):
-            mapped = [(ol.o.f(k), v) for k, v in ol.xs]
-            return sdisc(ol.o.target, mapped)
-        """
+        elif rl.is_map(rl):
+            mapped = [(rl.relation.f(k), v) for k, v in rl.xs]
+            return sdisc(rl.relation.source, mapped)
         raise ValueError(f"Unknown Order {type(o)}")
 
-"""
-def sorted_partition(o: Order[A], xs: List[A]) -> List[List[A]]:
+
+def sorted_partition(o: Relation[A], xs: List[A]) -> List[List[A]]:
     return sdisc(o, [(x,x) for x in xs])
 
-def sort(o: Order[A], xs: List[A]) -> List[A]:
+def sort(o: Relation[A], xs: List[A]) -> List[A]:
     return list(chain.from_iterable(sorted_partition(o, xs)))
 
 def test(max_=1000, len_=1000, iters=1000):
@@ -139,5 +134,4 @@ def test(max_=1000, len_=1000, iters=1000):
         new += (time.time_ns() - start)
         assert o == n
     return standard, new
-"""
 
