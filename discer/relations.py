@@ -1,3 +1,14 @@
+""" Class for representations of relations over another type.
+
+The classes are not relations themselves but are structures denoting/representing a relation over another type..
+Look at section 5 and 6 of the paper for more information.
+
+Relations stand in for both the `Order` and `Equiv` types described in the paper.
+Exactly which relation it represents depends on the function consuming the representation.
+Additionaly, while Relations are only used for those two types of relations the types can be used generally
+for a relation of any arity.
+"""
+
 from dataclasses import dataclass
 from itertools import chain
 from typing import (
@@ -23,6 +34,11 @@ V = TypeVar("V")
 
 
 class Relation(Protocol[C]):
+    """A generic relation over the type C
+
+    The exact nature of the Relation is decided by the function that uses the Relation.
+    For example, sdisc treats the Relation as a binary ordering Relation.
+    """
     ...
 
 
@@ -42,22 +58,36 @@ def as_relation(r: Relation[A]) -> Relation[A]:
 
 @dataclass
 class Trivial(Relation[A]):
+    """Represents the trivial Relation on A.
+
+    What "trivial" means depends on the function consuming this relation.
+    If you think about just the case where Trivial[A] represents a binary relation on A then
+    it is the relation where everything relates to everything else, formally { (a, b) | a, b in A }.
+    """
     pass
 
 
 @dataclass
 class Natural(Relation[int]):
+    """Represents the standard Relation on Natural numbers restricted to the subset [0, n].
+
+    What the "standard" Relation on the Natural numbers depends on the function using this representation.
+    Consider the case where this represents a binary ordering Relation, this representation is then
+    { (a, b) | a <= b and a, b in [0..n] }.
+    """
     n: int
 
 
 @dataclass
-class Product(Relation[Tuple[A, B]]):
+class ProductL(Relation[Tuple[A, B]]):
+    """Represents the Lexagraphic product on a Tuple[A, B] where the Relation on A takes precedent."""
     fst: Relation[A]
     snd: Relation[B]
 
 
 @dataclass
 class Map(Relation[A], Generic[A, B]):
+    """Represents a Relation mapping into another relation."""
     f: Callable[[A], B]
     source: Relation[B]
 
@@ -82,8 +112,8 @@ class _RelList(Generic[R, A, V]):
     @staticmethod
     def is_product(
         rl: "_RelList[R, A, V]",
-    ) -> "TypeGuard[_RelList[Product[F, S], Tuple[F, S], V]]":
-        return isinstance(rl.relation, Product)
+    ) -> "TypeGuard[_RelList[ProductL[F, S], Tuple[F, S], V]]":
+        return isinstance(rl.relation, ProductL)
 
     @staticmethod
     def is_map(rl: "_RelList[R, A, V]") -> "TypeGuard[_RelList[Map[A, B], A, V]]":
@@ -104,7 +134,7 @@ def _split(i: int) -> Tuple[int, int]:
 # 32 bit signed its are a product of two 16 bit natural numbers where the
 # first 16 bits are grouped into the negative numbers and the second half are the positive numbers
 # I think is the representation meant here.
-ordInt32 = Map(_split, Product(ordNat16, ordNat16))
+ordInt32 = Map(_split, ProductL(ordNat16, ordNat16))
 
 
 def _mod_2(i: int) -> int:
@@ -120,7 +150,7 @@ def _tuple(x: A) -> Tuple[A, A]:
 
 def refine(r1: Relation[A], r2: Relation[A]) -> Relation[A]:
     """Creates an Order on A that does r1 first then r2"""
-    return Map(_tuple, Product(r1, r2))
+    return Map(_tuple, ProductL(r1, r2))
 
 
 def sdisc(o: Relation[A], xs: List[Tuple[A, V]]) -> List[List[V]]:
